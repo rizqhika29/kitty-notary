@@ -1,132 +1,261 @@
-# AI Notary
+<div align="center">
 
-An Intelligent Contract on GenLayer that verifies whether an online event has actually occurred, using decentralized AI validator consensus.
+# 🐱 KittyNotary
 
-## How It Works
+### AI-Powered On-Chain Fact Verification
 
-1. A user submits a **claim** about an online event along with a **source URL**
-2. The contract fetches the source and sends it to an LLM to evaluate the claim
-3. GenLayer validators independently re-fetch the source and re-evaluate the claim
-4. Consensus is reached via GenLayer's equivalence principle: verdicts **and** confidence scores must agree
-5. The notarization result (`VERIFIED`, `NOT_VERIFIED`, or `UNCERTAIN`) is stored on-chain permanently with an immutable `record_id` (Keccak-256 of claim + source URL)
+**Verify claims. Store truth. Trust the consensus.**
 
-## Project Structure
+[![License: MIT](https://img.shields.io/badge/License-MIT-pink.svg)](LICENSE)
+[![GenLayer](https://img.shields.io/badge/Built%20on-GenLayer-blue.svg)](https://genlayer.com)
+[![Tests](https://img.shields.io/badge/Tests-48%2F48-brightgreen.svg)](#testing)
+[![Frontend](https://img.shields.io/badge/Frontend-Next.js-black.svg)](https://nextjs.org)
+
+[Live Demo](https://kitty-notary.vercel.app) · [Contract](https://studio.genlayer.com) · [Report Bug](https://github.com/rizqhika29/kitty-notary/issues)
+
+</div>
+
+---
+
+## ✨ What is KittyNotary?
+
+KittyNotary is a **GenLayer Intelligent Contract** that verifies whether online events actually happened. Submit a claim + source URL, and decentralized AI validators will reach consensus on its truthfulness — permanently stored on-chain.
 
 ```
-genlayer-ai-notary/
-├── contracts/
-│   └── ai_notary.py          # The Intelligent Contract
-├── frontend/                  # Next.js frontend
-│   ├── app/                   # App Router pages
-│   ├── components/            # React components
-│   ├── lib/                   # Contract integration & utilities
-│   ├── hooks/                 # Custom React hooks
-│   ├── types/                 # TypeScript types
-│   ├── styles/                # Global styles
-│   ├── public/                # Static assets
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.ts
-│   ├── next.config.ts
-│   ├── middleware.ts
-│   └── .env.example
-├── tests/
-│   ├── direct/                # In-memory direct-mode contract tests
-│   │   ├── conftest.py        # Windows-safe harness workarounds
-│   │   └── test_ai_notary.py
-│   └── integration/           # (place integration tests here)
-├── deploy/
-│   └── run.py                 # Deploy + interact via genlayer-py
-├── requirements.txt
-├── pyproject.toml
-├── .gitignore
-└── README.md
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Submit    │ ──▶ │  AI Leader  │ ──▶ │  Validators │ ──▶ │  On-Chain   │
+│   Claim     │     │  Evaluation │     │  Consensus  │     │  Result     │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+     You               LLM reads           Multiple AI          Permanent
+                       your source         agree on truth       record
 ```
 
-## Quick Start
+## 🎯 How It Works
 
-### 1. Python setup
+| Step | What Happens |
+|------|--------------|
+| **1. Submit** | User provides a claim + source URL via MetaMask |
+| **2. Fetch** | Contract fetches content from the source URL |
+| **3. Evaluate** | AI leader analyzes the claim against the source |
+| **4. Validate** | Multiple validators independently re-evaluate |
+| **5. Consensus** | Verdict + confidence must match across validators |
+| **6. Store** | Result permanently stored with immutable `record_id` |
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Smart Contract** | Python (GenLayer SDK) |
+| **Frontend** | Next.js 15, TypeScript, Tailwind CSS |
+| **Wallet** | MetaMask, Viem |
+| **Network** | GenLayer Studionet |
+| **Testing** | pytest, 48 test cases |
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 18+
+- MetaMask wallet
+- GenLayer Studionet ETH (for deployment)
+
+### 1️⃣ Clone & Install
 
 ```bash
-cd genlayer-ai-notary
+git clone https://github.com/rizqhika29/kitty-notary.git
+cd kitty-notary
+
+# Python dependencies
 pip install -r requirements.txt
+
+# Frontend dependencies
+cd frontend && npm install
 ```
 
-For development (test harness + pytest):
+### 2️⃣ Configure Environment
 
 ```bash
-pip install -e ".[dev]"
+# Root .env
+cp .env.example .env
+# Edit .env with your GENLAYER_PRIVATE_KEY and GENLAYER_RPC_URL
+
+# Frontend .env
+cd frontend
+cp .env.example .env
+# Edit NEXT_PUBLIC_CONTRACT_ADDRESS with your deployed contract
 ```
 
-### 2. Run the tests
+### 3️⃣ Run Tests
 
 ```bash
 pytest tests/direct/ -v
 ```
 
-The suite covers notarization, record storage & lookup, deduplication, requester queries, consensus acceptance/rejection, input validation, and HTTP error handling.
+### 4️⃣ Deploy Contract
 
-### 3. Frontend setup
+```bash
+python -m deploy.run deploy
+```
+
+### 5️⃣ Start Frontend
 
 ```bash
 cd frontend
-npm install
 npm run dev
 ```
 
-The frontend runs on http://localhost:3000 and connects to the contract at `NEXT_PUBLIC_CONTRACT_ADDRESS`. Copy `frontend/.env.example` to `frontend/.env.local` and set the deployed address.
+Visit [http://localhost:3000](http://localhost:3000) 🎉
 
-### 4. Deploy
+## 📁 Project Structure
 
-```bash
-# optional: configure studionet + funded account in .env (see .env.example)
-python deploy/run.py deploy
-python deploy/run.py status
-python deploy/run.py notarize "An earthquake hit Tokyo" "https://example.com/news/earthquake"
+```
+kitty-notary/
+├── 📄 contracts/
+│   └── ai_notary.py          # GenLayer Intelligent Contract
+├── 🌐 frontend/
+│   ├── app/                   # Next.js App Router
+│   │   ├── submit/            # Claim submission page
+│   │   ├── explorer/          # Browse all records
+│   │   ├── records/           # My records page
+│   │   └── dashboard/         # Analytics dashboard
+│   ├── components/            # React components
+│   │   ├── ClaimForm.tsx      # Submission form with wallet
+│   │   ├── RecordsTable.tsx   # Records browser with filters
+│   │   └── RecordDetailModal.tsx  # Detail view popup
+│   └── lib/                   # Contract integration
+├── 🧪 tests/
+│   ├── direct/                # Unit tests (48 cases)
+│   └── integration/           # Live studionet tests
+├── 🚀 deploy/
+│   ├── api_helper.py          # Server-side helper
+│   └── run.py                 # Deployment CLI
+└── 📋 requirements.txt
 ```
 
-You can also deploy from [GenLayer Studio](https://studio.genlayer.com) by importing `contracts/ai_notary.py`.
+## 🔧 Contract API
 
-## Contract API
+### Write Methods
 
-| Method | Type | Description |
-|--------|------|-------------|
-| `notarize(claim, source_url)` | `write` | Submit a claim + source URL for notarization. Returns the record index. Re-submitting the same claim+URL is deduplicated. Emits a `NotarizedEvent`. |
-| `get_count()` | `view` | Get total number of notarizations |
-| `get_record(index)` | `view` | Get a notarization record by index (JSON string) |
-| `get_record_by_id(record_id)` | `view` | Get a notarization record by its content hash |
-| `get_records_by_requester(requester)` | `view` | Get record indices for a requester address (as hex string, `0x…`) |
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `notarize` | `claim: str`, `source_url: str` | `u256` (index) | Submit a claim for verification |
 
-### Record JSON shape
+### View Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `get_count` | — | `u256` | Total number of records |
+| `get_record` | `index: u256` | `str` (JSON) | Get record by index |
+| `get_record_by_id` | `record_id: str` | `str` (JSON) | Get record by content hash |
+| `get_records_by_requester` | `requester: str` | `str` (JSON array) | Get indices for address |
+
+### Record Schema
 
 ```json
 {
-  "record_id": "0x…",
-  "claim": "An earthquake hit Tokyo today",
-  "source_url": "https://example.com/news/earthquake",
+  "record_id": "a1b2c3d4...",
+  "claim": "Magnitude 5.0 earthquake struck Tokyo",
+  "source_url": "https://reuters.com/article/...",
   "verdict": "VERIFIED",
-  "reason": "Article confirms the event",
-  "confidence": 0.95,
-  "requester": "0x…",
-  "timestamp": "2026-08-17T11:09:02Z"
+  "reason": "Multiple sources confirm the seismic event...",
+  "confidence": 8500,
+  "requester": "0x1234...5678",
+  "timestamp": 1693000000
 }
 ```
 
-## Key Design Decisions
+> **Note:** Confidence is stored as basis points (0-10000). `8500` = 85% confidence.
 
-- **JSON output**: prompts force `response_format="json"` for parseable, comparable LLM responses
-- **Calldata-safe results**: LLM floats (e.g. `0.95`) are not calldata-encodable on GenLayer, so `confidence` is transported as a string and normalized by the contract
-- **Equivalence principle**: validators compare verdict **and** confidence (within ±0.2), not exact text
-- **Content-addressed records**: `record_id = keccak256(claim + source_url)` makes every notarization unique and queryable
-- **Input validation**: empty claims and malformed URLs are rejected before any external call
-- **Events**: `NotarizedEvent` is emitted so indexers/dApps can watch new notarizations
+## 🎨 Features
 
-## When to Use
+### 👛 Per-User Wallet Integration
+Every submission is signed by the user's own MetaMask wallet. The `requester` field on-chain = user's wallet address.
 
-AI Notary fits GenLayer when you need a **shared, on-chain judgment** about whether an online event occurred. If you only need to store a pre-computed result, a normal backend is simpler.
+### 🔍 Explorer & My Records
+Browse all notarizations or filter by your own wallet. Click **Detail** to see full AI reasoning.
 
-## Resources
+### 📊 Dashboard
+Real-time stats: total records, verification rate, recent submissions.
 
-- [GenLayer Docs](https://docs.genlayer.com)
-- [GenLayer Discord](https://discord.gg/8Jm4v89VAu)
-- [GenLayer Twitter/X](https://x.com/GenLayer)
+### ⚡ Batch Loading
+Records are fetched in parallel batches for fast page loads (~8s cold start).
+
+### 🛡️ Security Features
+- Domain allowlist (150+ verified sources)
+- Input validation (claim ≤500 chars, URL ≤2048 chars)
+- Transaction receipt checking (immediate error detection)
+- Client-side payload verification
+
+### 🎯 Record Detail Modal
+Click any record to see:
+- Full claim text
+- Source URL (clickable)
+- Verdict badge with confidence bar
+- Complete AI reasoning
+- On-chain metadata
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+pytest tests/direct/ -v
+
+# Run specific test suite
+pytest tests/direct/test_ai_notary.py -v
+
+# Run security tests
+pytest tests/direct/test_ai_notary_security.py -v
+```
+
+**Test Coverage:**
+- ✅ Notarization flow
+- ✅ Record storage & lookup
+- ✅ Deduplication
+- ✅ Requester queries
+- ✅ Consensus acceptance/rejection
+- ✅ Input validation
+- ✅ Confidence formats
+- ✅ Edge cases
+
+## 🌐 Allowed Domains
+
+The contract only accepts source URLs from verified domains:
+
+| Category | Examples |
+|----------|----------|
+| **Major News** | Reuters, AP, BBC, CNN, Guardian, NYT |
+| **Regional** | Japan Times, Korea Herald, Straits Times |
+| **Fact-Check** | Snopes, PolitiFact, Full Fact |
+| **Science** | Nature, Science, arXiv, PubMed |
+| **Government** | .gov, .gov.uk, .mil |
+| **International** | WHO, UN, NATO, World Bank |
+
+View full list → [`contracts/ai_notary.py`](contracts/ai_notary.py)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [GenLayer](https://genlayer.com) for the Intelligent Contract platform
+- The GenLayer community for support and feedback
+
+---
+
+<div align="center">
+
+**Built with ❤️ by [rizqhika29](https://github.com/rizqhika29)**
+
+[⬆ Back to Top](#-kittynotary)
+
+</div>
