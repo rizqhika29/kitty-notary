@@ -1,19 +1,45 @@
 import { NextResponse } from "next/server";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import path from "node:path";
 
-const execFileAsync = promisify(execFile);
+/**
+ * API Route for KittyNotary contract interactions.
+ *
+ * Supports two modes:
+ * 1. Local mode (no API_URL): Spawns Python helper directly (for local dev)
+ * 2. External mode (API_URL set): Proxies to external API server (for Vercel)
+ */
 
-const ROOT = path.resolve(process.cwd(), "..");
-const HELPER = path.join(ROOT, "deploy", "api_helper.py");
+const EXTERNAL_API_URL = process.env.API_URL;
 
-function pythonBin(): string {
-  return process.env.PYTHON_BIN || "python";
+// --- External API mode (Vercel) ---
+async function proxyToExternal(body: unknown): Promise<NextResponse> {
+  if (!EXTERNAL_API_URL) {
+    return NextResponse.json(
+      { error: "API_URL not configured" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const res = await fetch(`${EXTERNAL_API_URL}/api/rpc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    console.error("[api/rpc] external API error:", err);
+    return NextResponse.json(
+      { error: "Failed to connect to API server" },
+      { status: 502 }
+    );
+  }
 }
 
-/** Only read-only views + unsigned tx building are exposed over HTTP.
- *  The server-key `write` action stays available in the CLI helper only. */
+// --- Local mode (spawn Python helper) ---
+// Only used when API_URL is not set (local development)
+
 const ALLOWED_ACTIONS = new Set(["read", "build", "views"]);
 
 const READ_METHODS = new Set([
@@ -30,8 +56,6 @@ const MAX_ARG_STRING = 2048;
 const MAX_VIEWS_PER_BATCH = 12;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-// Short TTL so bouncing between pages feels instant; get_record_by_id is
-// excluded because submit-confirmation polling must always be fresh.
 const CACHE_TTL_MS = 3_000;
 const responseCache = new Map<string, { at: number; body: unknown }>();
 
@@ -42,7 +66,6 @@ function getCached(key: string): unknown | undefined {
   return undefined;
 }
 
-// --- naive per-IP sliding-window rate limit -------------------------------
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_REQUESTS = 60;
 const rateHits = new Map<string, number[]>();
@@ -56,10 +79,7 @@ function isRateLimited(ip: string): boolean {
   }
   recent.push(now);
   rateHits.set(ip, recent);
-  if (rateHits.size > 5_000) {
-    // crude memory bound: drop everything and start fresh
-    rateHits.clear();
-  }
+  if (rateHits.size > 5_000) rateHits.clear();
   return false;
 }
 
@@ -69,8 +89,6 @@ function clientIp(request: Request): string {
   return request.headers.get("x-real-ip") ?? "local";
 }
 
-/** Contract errors carry useful user-facing messages (e.g. "claim too long"),
- *  but strip anything that looks like a filesystem path before returning. */
 function sanitizeError(message: string): string {
   return message
     .replace(/(?:[A-Za-z]:)?[\\/][\w\-. ]+\.(?:py|js|ts|mjs|json)/g, "[path]")
@@ -83,42 +101,6 @@ interface RpcBody {
   args?: unknown;
   from?: unknown;
   views?: unknown;
-}
-
-// Helper spawns must never overlap: concurrent python.exe launches on Windows
-// race over bytecode caches and fail transiently ("upstream helper failed").
-// Serialize all invocations through a single promise chain.
-let helperChain: Promise<unknown> = Promise.resolve();
-function enqueueHelper<T>(fn: () => Promise<T>): Promise<T> {
-  const run = helperChain.then(fn, fn);
-  helperChain = run.catch(() => undefined);
-  return run;
-}
-
-async function spawnHelper(cmdArgs: string[]): Promise<string> {
-  return enqueueHelper(async () => {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const { stdout } = await execFileAsync(pythonBin(), cmdArgs, {
-          cwd: ROOT,
-          timeout: 180_000,
-          maxBuffer: 4 * 1024 * 1024,
-          windowsHide: true,
-          env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
-        });
-        return stdout;
-      } catch (err) {
-        // Log full details server-side; retry once for transient OS races,
-        // then surface a generic message to the client.
-        console.error(`[api/rpc] helper failed (attempt ${attempt}):`, err);
-        if (attempt === 2) {
-          throw new Error("upstream helper failed");
-        }
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-    }
-    throw new Error("unreachable");
-  });
 }
 
 function validateArgs(args: unknown): string | null {
@@ -140,6 +122,62 @@ function validateArgs(args: unknown): string | null {
   return null;
 }
 
+function parseHelperOutput(
+  stdout: string
+): { ok: true; body: unknown } | { ok: false; error: string; status: number } {
+  const lines = stdout.trim().split("\n");
+  const last = lines[lines.length - 1];
+  let parsed: { result?: unknown; error?: string };
+  try {
+    parsed = JSON.parse(last);
+  } catch {
+    console.error("[api/rpc] unparseable helper output:", last?.slice(0, 500));
+    return { ok: false, error: "helper returned invalid output", status: 502 };
+  }
+  if (parsed.error) {
+    return { ok: false, error: sanitizeError(parsed.error), status: 502 };
+  }
+  return { ok: true, body: parsed };
+}
+
+let helperChain: Promise<unknown> = Promise.resolve();
+function enqueueHelper<T>(fn: () => Promise<T>): Promise<T> {
+  const run = helperChain.then(fn, fn);
+  helperChain = run.catch(() => undefined);
+  return run;
+}
+
+async function spawnHelper(cmdArgs: string[]): Promise<string> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const path = await import("node:path");
+  const execFileAsync = promisify(execFile);
+
+  const ROOT = path.resolve(process.cwd(), "..");
+  const HELPER = path.join(ROOT, "deploy", "api_helper.py");
+  const pythonBin = process.env.PYTHON_BIN || "python";
+
+  return enqueueHelper(async () => {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { stdout } = await execFileAsync(pythonBin, cmdArgs, {
+          cwd: ROOT,
+          timeout: 180_000,
+          maxBuffer: 4 * 1024 * 1024,
+          windowsHide: true,
+          env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+        });
+        return stdout;
+      } catch (err) {
+        console.error(`[api/rpc] helper failed (attempt ${attempt}):`, err);
+        if (attempt === 2) throw new Error("upstream helper failed");
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+    throw new Error("unreachable");
+  });
+}
+
 export async function POST(request: Request) {
   if (isRateLimited(clientIp(request))) {
     return NextResponse.json(
@@ -155,6 +193,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid json body" }, { status: 400 });
   }
 
+  // --- External API mode ---
+  if (EXTERNAL_API_URL) {
+    return proxyToExternal(body);
+  }
+
+  // --- Local mode (Python helper) ---
   const { action, method, args, from } = body;
 
   if (typeof action !== "string" || !ALLOWED_ACTIONS.has(action)) {
@@ -164,7 +208,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // ---- batched reads: {action:"views", views:[{method,args},...]} ----------
   if (action === "views") {
     const views = body.views;
     if (!Array.isArray(views) || views.length === 0 || views.length > MAX_VIEWS_PER_BATCH) {
@@ -192,6 +235,8 @@ export async function POST(request: Request) {
     }
 
     try {
+      const ROOT = (await import("node:path")).resolve(process.cwd(), "..");
+      const HELPER = (await import("node:path")).join(ROOT, "deploy", "api_helper.py");
       const stdout = await spawnHelper([HELPER, "views", "", JSON.stringify(views)]);
       const parsed = parseHelperOutput(stdout);
       if (!parsed.ok) {
@@ -221,6 +266,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: argsErr }, { status: 400 });
   }
 
+  const ROOT = (await import("node:path")).resolve(process.cwd(), "..");
+  const HELPER = (await import("node:path")).join(ROOT, "deploy", "api_helper.py");
   const cmdArgs = [
     HELPER,
     action,
@@ -262,22 +309,4 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "upstream helper failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }
-}
-
-function parseHelperOutput(
-  stdout: string
-): { ok: true; body: unknown } | { ok: false; error: string; status: number } {
-  const lines = stdout.trim().split("\n");
-  const last = lines[lines.length - 1];
-  let parsed: { result?: unknown; error?: string };
-  try {
-    parsed = JSON.parse(last);
-  } catch {
-    console.error("[api/rpc] unparseable helper output:", last?.slice(0, 500));
-    return { ok: false, error: "helper returned invalid output", status: 502 };
-  }
-  if (parsed.error) {
-    return { ok: false, error: sanitizeError(parsed.error), status: 502 };
-  }
-  return { ok: true, body: parsed };
 }

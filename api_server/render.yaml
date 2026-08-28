@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: kittynotary-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt && pip install -r ../requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: GENLAYER_PRIVATE_KEY
+        sync: false
+      - key: GENLAYER_RPC_URL
+        value: "https://studio.genlayer.com/api"
+      - key: NEXT_PUBLIC_CONTRACT_ADDRESS
+        sync: false
+      - key: NEXT_PUBLIC_GENLAYER_NETWORK
+        value: "studionet"
+      - key: PORT
+        value: "8080"

@@ -124,6 +124,10 @@ kitty-notary/
 │   │   ├── RecordsTable.tsx   # Records browser with filters
 │   │   └── RecordDetailModal.tsx  # Detail view popup
 │   └── lib/                   # Contract integration
+├── 🐍 api_server/
+│   ├── app.py                 # Flask API server (for Vercel)
+│   ├── requirements.txt       # Python dependencies
+│   └── render.yaml            # Render deployment config
 ├── 🧪 tests/
 │   ├── direct/                # Unit tests (48 cases)
 │   └── integration/           # Live studionet tests
@@ -232,6 +236,75 @@ The contract only accepts source URLs from verified domains:
 | **International** | WHO, UN, NATO, World Bank |
 
 View full list → [`contracts/ai_notary.py`](contracts/ai_notary.py)
+
+## 🚀 Deploy to Vercel + Render
+
+### Architecture
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│  Vercel         │     │  Render         │
+│  (Frontend)     │ ──▶ │  (API Server)   │
+│  Next.js        │     │  Python + Flask  │
+└─────────────────┘     └─────────────────┘
+                              │
+                              ▼
+                        ┌─────────────────┐
+                        │  GenLayer       │
+                        │  Studionet      │
+                        └─────────────────┘
+```
+
+### Step 1: Deploy API Server to Render
+
+1. Fork this repository
+2. Go to [render.com](https://render.com) and create a new **Web Service**
+3. Connect your GitHub repository
+4. Configure:
+   - **Root Directory**: `api_server`
+   - **Build Command**: `pip install -r requirements.txt && pip install -r ../requirements.txt`
+   - **Start Command**: `python app.py`
+5. Add environment variables:
+   ```
+   GENLAYER_PRIVATE_KEY=your_private_key
+   GENLAYER_RPC_URL=https://studio.genlayer.com/api
+   NEXT_PUBLIC_CONTRACT_ADDRESS=your_contract_address
+   NEXT_PUBLIC_GENLAYER_NETWORK=studionet
+   ```
+6. Deploy and note your API URL (e.g., `https://kittynotary-api.onrender.com`)
+
+### Step 2: Deploy Frontend to Vercel
+
+1. Go to [vercel.com](https://vercel.com) and import your GitHub repository
+2. Configure:
+   - **Framework Preset**: Next.js
+   - **Root Directory**: `frontend`
+3. Add environment variables:
+   ```
+   NEXT_PUBLIC_CONTRACT_ADDRESS=your_contract_address
+   NEXT_PUBLIC_RPC_ENDPOINT=https://studio.genlayer.com/api
+   NEXT_PUBLIC_NETWORK=studionet
+   API_URL=https://kittynotary-api.onrender.com
+   ```
+4. Deploy
+
+### Step 3: Verify
+
+1. Visit your Vercel URL
+2. Connect MetaMask
+3. Submit a test claim
+4. Check the API server logs on Render for any issues
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed contract address | ✅ |
+| `NEXT_PUBLIC_RPC_ENDPOINT` | GenLayer RPC URL | ✅ |
+| `NEXT_PUBLIC_NETWORK` | Network name (`studionet`) | ✅ |
+| `API_URL` | Render API server URL | ✅ (Vercel only) |
+| `GENLAYER_PRIVATE_KEY` | Server wallet private key | ✅ (API only) |
+| `GENLAYER_RPC_URL` | GenLayer RPC URL | ✅ (API only) |
 
 ## 🤝 Contributing
 
