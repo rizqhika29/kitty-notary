@@ -1,0 +1,8 @@
+# Deployment / interaction SDK (real contract SDK is bundled with genlayer-test)
+genlayer-py>=0.16.0
+
+# Test harness (includes the genlayer SDK for contract direct-mode tests)
+genlayer-test>=0.29.0
+
+# Test runner
+pytest>=8.0

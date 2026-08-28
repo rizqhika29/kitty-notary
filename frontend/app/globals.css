@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 340 33% 99%;
+  --foreground: 340 25% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 340 25% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 340 25% 18%;
+  --primary: 340 82% 65%;
+  --primary-foreground: 340 40% 99%;
+  --secondary: 340 45% 94%;
+  --secondary-foreground: 340 30% 30%;
+  --muted: 340 40% 95%;
+  --muted-foreground: 340 12% 45%;
+  --accent: 320 60% 94%;
+  --accent-foreground: 340 40% 30%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 340 30% 90%;
+  --input: 340 30% 88%;
+  --ring: 340 82% 65%;
+  --radius: 1rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(80% 55% at 15% 0%, hsl(355 100% 96%) 0%, transparent 60%),
+    radial-gradient(70% 50% at 90% 12%, hsl(280 90% 95%) 0%, transparent 60%),
+    linear-gradient(
+      165deg,
+      hsl(350 100% 97%) 0%,
+      hsl(340 100% 93%) 28%,
+      hsl(310 80% 92%) 52%,
+      hsl(270 75% 92%) 74%,
+      hsl(260 70% 90%) 100%
+    );
+  background-attachment: fixed;
+  color: hsl(var(--foreground));
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-quicksand), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .text-gradient-pink {
+    background: linear-gradient(
+      135deg,
+      hsl(340 82% 55%),
+      hsl(285 70% 50%) 55%,
+      hsl(260 75% 55%)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .bg-blob-pink {
+    background: radial-gradient(
+      60% 60% at 30% 30%,
+      hsl(340 100% 88%),
+      transparent 70%
+    );
+  }
+
+  .bg-blob-lilac {
+    background: radial-gradient(
+      60% 60% at 70% 70%,
+      hsl(275 85% 88%),
+      transparent 70%
+    );
+  }
+
+  .shadow-glow-pink {
+    box-shadow: 0 8px 40px -12px hsl(340 82% 65% / 0.45);
+  }
+
+  .glass-card {
+    background: hsl(0 0% 100% / 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .svg-anchor {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+}

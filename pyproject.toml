@@ -1,0 +1,17 @@
+[project]
+name = "ai-notary"
+version = "0.1.0"
+description = "AI Notary - on-chain verification of online events using GenLayer Intelligent Contracts"
+requires-python = ">=3.12"
+dependencies = [
+    "genlayer-py>=0.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "genlayer-test>=0.29.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
