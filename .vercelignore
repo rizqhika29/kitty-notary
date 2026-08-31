@@ -1,16 +1,8 @@
-# Ignore Python files and directories
-*.py
-__pycache__/
-.pytest_cache/
-api_server/
-deploy/
-tests/
-contracts/
-requirements.txt
-pyproject.toml
-render.yaml
-.env
-.env.*
-*.pyc
-.venv/
-venv/
+# Ignore everything except frontend
+*
+!frontend/
+!frontend/**
+!vercel.json
+!package.json
+!.gitignore
+!.nvmrc
