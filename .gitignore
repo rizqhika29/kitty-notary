@@ -1,16 +1,35 @@
+# Dependencies
 node_modules/
+.venv/
+venv/
+
+# Next.js
 .next/
 out/
 build/
 dist/
+
+# Environment
 .env*.local
 .env
+
+# OS
 .DS_Store
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
 artifacts/
-.venv/
+
+# Logs
 *.log
 *.tsbuildinfo
+
+# Vercel
 .vercel
+
+# IDE
+.vscode/
+.idea/

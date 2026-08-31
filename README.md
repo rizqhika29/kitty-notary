@@ -66,42 +66,47 @@ KittyNotary is a **GenLayer Intelligent Contract** that verifies whether online 
 git clone https://github.com/rizqhika29/kitty-notary.git
 cd kitty-notary
 
-# Python dependencies
-pip install -r requirements.txt
+# Frontend dependencies (runs in root)
+npm install
 
-# Frontend dependencies
-cd frontend && npm install
+# Python dependencies (for local dev / server)
+cd server
+pip install -r requirements.txt
+pip install -r api_server/requirements.txt
+cd ..
 ```
 
 ### 2️⃣ Configure Environment
 
 ```bash
-# Root .env
+# Root .env (frontend)
 cp .env.example .env
-# Edit .env with your GENLAYER_PRIVATE_KEY and GENLAYER_RPC_URL
+# Edit .env with your NEXT_PUBLIC_CONTRACT_ADDRESS
 
-# Frontend .env
-cd frontend
-cp .env.example .env
-# Edit NEXT_PUBLIC_CONTRACT_ADDRESS with your deployed contract
+# Server .env
+cp server/.env.example server/.env  # if exists
+# Edit server/.env with GENLAYER_PRIVATE_KEY
 ```
 
 ### 3️⃣ Run Tests
 
 ```bash
+cd server
 pytest tests/direct/ -v
+cd ..
 ```
 
 ### 4️⃣ Deploy Contract
 
 ```bash
+cd server
 python -m deploy.run deploy
+cd ..
 ```
 
 ### 5️⃣ Start Frontend
 
 ```bash
-cd frontend
 npm run dev
 ```
 
@@ -111,30 +116,27 @@ Visit [http://localhost:3000](http://localhost:3000) 🎉
 
 ```
 kitty-notary/
-├── 📄 contracts/
-│   └── ai_notary.py          # GenLayer Intelligent Contract
-├── 🌐 frontend/
-│   ├── app/                   # Next.js App Router
-│   │   ├── submit/            # Claim submission page
-│   │   ├── explorer/          # Browse all records
-│   │   ├── records/           # My records page
-│   │   └── dashboard/         # Analytics dashboard
-│   ├── components/            # React components
-│   │   ├── ClaimForm.tsx      # Submission form with wallet
-│   │   ├── RecordsTable.tsx   # Records browser with filters
-│   │   └── RecordDetailModal.tsx  # Detail view popup
-│   └── lib/                   # Contract integration
-├── 🐍 api_server/
-│   ├── app.py                 # Flask API server (for Vercel)
-│   ├── requirements.txt       # Python dependencies
-│   └── render.yaml            # Render deployment config
-├── 🧪 tests/
-│   ├── direct/                # Unit tests (48 cases)
-│   └── integration/           # Live studionet tests
-├── 🚀 deploy/
-│   ├── api_helper.py          # Server-side helper
-│   └── run.py                 # Deployment CLI
-└── 📋 requirements.txt
+├── 🌐 app/                    # Next.js App Router
+│   ├── api/rpc/               # API routes (proxy to server)
+│   ├── submit/                # Claim submission page
+│   ├── explorer/              # Browse all records
+│   ├── records/               # My records page
+│   └── dashboard/             # Analytics dashboard
+├── 🧩 components/             # React components
+│   ├── ClaimForm.tsx          # Submission form with wallet
+│   ├── RecordsTable.tsx       # Records browser with filters
+│   └── RecordDetailModal.tsx  # Detail view popup
+├── 📚 lib/                    # Contract integration & utilities
+├── 🪝 hooks/                  # Custom React hooks
+├── 📋 types/                  # TypeScript types
+├── 🖥️ server/                 # Backend (Python)
+│   ├── contracts/             # GenLayer Intelligent Contract
+│   ├── api_server/            # Flask API for Render
+│   ├── deploy/                # Deployment CLI & helper
+│   └── tests/                 # Test suites (48 cases)
+├── 📄 vercel.json             # Vercel config
+├── 📋 package.json            # Node.js dependencies
+└── 📝 README.md
 ```
 
 ## 🔧 Contract API
@@ -203,6 +205,7 @@ Click any record to see:
 
 ```bash
 # Run all tests
+cd server
 pytest tests/direct/ -v
 
 # Run specific test suite
@@ -261,7 +264,7 @@ View full list → [`contracts/ai_notary.py`](contracts/ai_notary.py)
 2. Go to [render.com](https://render.com) and create a new **Web Service**
 3. Connect your GitHub repository
 4. Configure:
-   - **Root Directory**: `api_server`
+   - **Root Directory**: `server/api_server`
    - **Build Command**: `pip install -r requirements.txt && pip install -r ../requirements.txt`
    - **Start Command**: `python app.py`
 5. Add environment variables:
@@ -276,9 +279,7 @@ View full list → [`contracts/ai_notary.py`](contracts/ai_notary.py)
 ### Step 2: Deploy Frontend to Vercel
 
 1. Go to [vercel.com](https://vercel.com) and import your GitHub repository
-2. Configure:
-   - **Framework Preset**: Next.js
-   - **Root Directory**: `frontend`
+2. Vercel will auto-detect Next.js (no Root Directory configuration needed!)
 3. Add environment variables:
    ```
    NEXT_PUBLIC_CONTRACT_ADDRESS=your_contract_address

@@ -1,7 +1,6 @@
 {
-  "buildCommand": "cd frontend && npm run build",
-  "installCommand": "cd frontend && npm install",
   "framework": "nextjs",
-  "outputDirectory": "frontend/.next",
-  "ignoreCommand": "git ls-files --cached --ignored --exclude-standard | grep -v frontend/"
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": ".next"
 }

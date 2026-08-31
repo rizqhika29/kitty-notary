@@ -153,8 +153,8 @@ async function spawnHelper(cmdArgs: string[]): Promise<string> {
   const path = await import("node:path");
   const execFileAsync = promisify(execFile);
 
-  const ROOT = path.resolve(process.cwd(), "..");
-  const HELPER = path.join(ROOT, "deploy", "api_helper.py");
+  const ROOT = path.resolve(process.cwd(), "server");
+  const HELPER = path.join(ROOT, "server", "deploy", "api_helper.py");
   const pythonBin = process.env.PYTHON_BIN || "python";
 
   return enqueueHelper(async () => {
@@ -235,8 +235,8 @@ export async function POST(request: Request) {
     }
 
     try {
-      const ROOT = (await import("node:path")).resolve(process.cwd(), "..");
-      const HELPER = (await import("node:path")).join(ROOT, "deploy", "api_helper.py");
+  const ROOT = (await import("node:path")).resolve(process.cwd(), "server");
+      const HELPER = (await import("node:path")).join(ROOT, "server", "deploy", "api_helper.py");
       const stdout = await spawnHelper([HELPER, "views", "", JSON.stringify(views)]);
       const parsed = parseHelperOutput(stdout);
       if (!parsed.ok) {
@@ -266,8 +266,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: argsErr }, { status: 400 });
   }
 
-  const ROOT = (await import("node:path")).resolve(process.cwd(), "..");
-  const HELPER = (await import("node:path")).join(ROOT, "deploy", "api_helper.py");
+      const ROOT = (await import("node:path")).resolve(process.cwd(), "server");
+  const HELPER = (await import("node:path")).join(ROOT, "server", "deploy", "api_helper.py");
   const cmdArgs = [
     HELPER,
     action,
