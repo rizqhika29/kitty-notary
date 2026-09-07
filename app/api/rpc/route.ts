@@ -1,6 +1,10 @@
 ﻿import { NextResponse } from "next/server";
+import { genCall, buildTransaction } from "@/lib/genlayer/rpc";
+import { STUDIONET } from "@/lib/genlayer/chain";
 
-const EXTERNAL_API_URL = process.env.API_URL;
+const RPC_URL = process.env.GENLAYER_RPC_URL || STUDIONET.rpcUrl;
+const CONTRACT = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
+const SENDER = process.env.NEXT_PUBLIC_SENDER_ADDRESS || "";
 
 const ALLOWED_ACTIONS = new Set(["read", "build", "views"]);
 const READ_METHODS = new Set([
@@ -101,14 +105,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid json body" }, { status: 400 });
   }
 
-  if (!EXTERNAL_API_URL) {
-    return NextResponse.json(
-      { error: "API_URL not configured — backend API server not available" },
-      { status: 503 }
-    );
-  }
-
-  const { action, method, args, from } = body;
+  const { action, method, args } = body;
 
   if (typeof action !== "string" || !ALLOWED_ACTIONS.has(action)) {
     return NextResponse.json(
@@ -117,6 +114,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // --- views (batch read) ---
   if (action === "views") {
     const views = body.views;
     if (!Array.isArray(views) || views.length === 0 || views.length > MAX_VIEWS_PER_BATCH) {
@@ -136,8 +134,31 @@ export async function POST(request: Request) {
       const err = validateArgs(v.args ?? []);
       if (err) return NextResponse.json({ error: err }, { status: 400 });
     }
+
+    const ck = JSON.stringify({ a: "views", v: views });
+    const hit = getCached(ck);
+    if (hit !== undefined) return NextResponse.json(hit as Record<string, unknown>);
+
+    try {
+      const results = await Promise.all(
+        views.map(async (item: { method: string; args?: (string | number | boolean | null)[] }) => {
+          try {
+            return await genCall(RPC_URL, CONTRACT, SENDER, item.method, item.args ?? []);
+          } catch {
+            return null;
+          }
+        })
+      );
+      const result = { result: results };
+      setCached(ck, result);
+      return NextResponse.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "views failed";
+      return NextResponse.json({ error: sanitizeError(message) }, { status: 502 });
+    }
   }
 
+  // --- read / build ---
   if (typeof method !== "string") {
     return NextResponse.json({ error: "method must be a string" }, { status: 400 });
   }
@@ -155,6 +176,7 @@ export async function POST(request: Request) {
   }
 
   if (action === "build") {
+    const from = body.from;
     if (typeof from !== "string" || !ADDRESS_RE.test(from)) {
       return NextResponse.json(
         { error: "build requires a valid `from` address (0x + 40 hex chars)" },
@@ -164,40 +186,28 @@ export async function POST(request: Request) {
   }
 
   const cacheable = action === "read" && method !== "get_record_by_id";
-  const cacheKey = JSON.stringify(body);
+  const ck = JSON.stringify({ a: action, m: method, args });
   if (cacheable) {
-    const hit = getCached(cacheKey);
-    if (hit !== undefined) {
-      return NextResponse.json(hit as Record<string, unknown>);
-    }
+    const hit = getCached(ck);
+    if (hit !== undefined) return NextResponse.json(hit as Record<string, unknown>);
   }
 
   try {
-    const res = await fetch(`${EXTERNAL_API_URL}/api/rpc`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let result: unknown;
+    const safeArgs = Array.isArray(args) ? args : [];
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: sanitizeError(data.error || "upstream error") },
-        { status: res.status }
-      );
+    if (action === "read") {
+      result = await genCall(RPC_URL, CONTRACT, SENDER, method, safeArgs);
+    } else {
+      const from = body.from as string;
+      result = buildTransaction(CONTRACT, from, method, safeArgs);
     }
 
-    if (cacheable) {
-      setCached(cacheKey, data);
-    }
-
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("[api/rpc] upstream error:", err);
-    return NextResponse.json(
-      { error: "Failed to connect to API server" },
-      { status: 502 }
-    );
+    const response = { result };
+    if (cacheable) setCached(ck, response);
+    return NextResponse.json(response);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "unknown error";
+    return NextResponse.json({ error: sanitizeError(message) }, { status: 502 });
   }
 }
