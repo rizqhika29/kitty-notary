@@ -1,4 +1,4 @@
-# Ignore server/backend files
+# Ignore server/backend files (except api/ Python function)
 server/
 node_modules/
 .next/
