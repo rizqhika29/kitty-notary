@@ -1,3 +1,0 @@
-genlayer-py>=0.16.0
-eth-abi>=5.0.0
-eth-utils>=3.0.0

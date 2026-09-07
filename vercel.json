@@ -2,11 +2,5 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "functions": {
-    "api/**/*.py": {
-      "maxDuration": 30,
-      "excludeFiles": "{server/**,tests/**,__tests__/**,**/*.test.py,**/test_*.py,node_modules/**}"
-    }
-  }
+  "outputDirectory": ".next"
 }
