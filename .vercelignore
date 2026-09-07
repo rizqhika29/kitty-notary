@@ -1,8 +1,7 @@
-# Ignore everything except frontend
-*
-!frontend/
-!frontend/**
-!vercel.json
-!package.json
-!.gitignore
-!.nvmrc
+# Ignore server/backend files
+server/
+node_modules/
+.next/
+.vercel
+*.log
+.git

@@ -33,3 +33,5 @@ artifacts/
 # IDE
 .vscode/
 .idea/
+
+.vercel
