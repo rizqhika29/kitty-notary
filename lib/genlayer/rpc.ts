@@ -120,7 +120,7 @@ export function buildTransaction(
   const { encodeAbiParameters, keccak256, toBytes, toHex } = require("viem");
 
   const addTxSignature =
-    "addTransaction(address,address,uint256,uint256,bytes,uint256)";
+    "addTransaction(address,address,uint256,uint256,bytes)";
   const selector = keccak256(toBytes(addTxSignature)).slice(0, 10);
 
   const abiParams = encodeAbiParameters(
@@ -130,7 +130,6 @@ export function buildTransaction(
       { type: "uint256" },
       { type: "uint256" },
       { type: "bytes" },
-      { type: "uint256" },
     ],
     [
       senderAddress as `0x${string}`,
@@ -138,7 +137,6 @@ export function buildTransaction(
       BigInt(5), // defaultNumberOfInitialValidators
       BigInt(3), // defaultConsensusMaxRotations
       calldataEncoded as `0x${string}`,
-      BigInt(0), // validUntil
     ]
   );
 
