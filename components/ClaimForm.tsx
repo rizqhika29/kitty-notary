@@ -18,7 +18,7 @@ import type { NotarizationRecord } from "@/types";
 const MAX_CLAIM = 500; // keep in sync with contracts/ai_notary.py
 const MAX_SOURCE_URL = 2048;
 const POLL_INTERVAL_MS = 10_000;
-const POLL_MAX_ATTEMPTS = 60; // ~10 minutes of active waiting
+const POLL_MAX_ATTEMPTS = 30; // ~5 minutes of active waiting
 
 type Phase = "idle" | "signing" | "pending" | "confirmed" | "deferred";
 
@@ -350,13 +350,25 @@ export default function ClaimForm() {
                     </p>
                   )}
                   {phase === "deferred" && (
-                    <p className="mt-1 text-xs">
-                      Studionet consensus can take a while. The record will appear in{" "}
-                      <a href="/records" className="font-semibold underline">
-                        My Records
-                      </a>{" "}
-                      once validators finish — nothing is lost.
-                    </p>
+                    <div className="mt-2 space-y-2">
+                      <p className="text-xs">
+                        Consensus is taking longer than expected. This can happen
+                        when validators fail to fetch the source URL, or network
+                        congestion delays processing.
+                      </p>
+                      <p className="text-xs">
+                        Check the transaction status on{" "}
+                        <a
+                          href={`https://genlayer-explorer.vercel.app/tx/${submitted.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold underline"
+                        >
+                          Explorer
+                        </a>{" "}
+                        to see validator execution details.
+                      </p>
+                    </div>
                   )}
                 </>
               )}
