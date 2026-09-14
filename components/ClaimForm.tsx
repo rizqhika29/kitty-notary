@@ -6,11 +6,12 @@ import { useToast } from "@/components/ui/Toast";
 import {
   batchViews,
   buildNotarizeTx,
+  buildReNotarizeTx,
   computeRecordId,
   getRecordById,
   waitForReceipt,
 } from "@/lib/contract";
-import { safeConfidence, safeSourceHref } from "@/lib/utils";
+import { safeConfidence, safeSourceHref, shortDigest, daysUntilExpiry, isExpired } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { KittyCartoon, PawPrint } from "@/components/cat";
 import type { NotarizationRecord } from "@/types";
@@ -39,6 +40,7 @@ export default function ClaimForm() {
   const [confirmed, setConfirmed] = useState<NotarizationRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recentRecords, setRecentRecords] = useState<NotarizationRecord[]>([]);
+  const [reNotarizingId, setReNotarizingId] = useState<string | null>(null);
 
   const claimValid = claim.trim().length > 0 && claim.trim().length <= MAX_CLAIM;
   let urlValid = false;
@@ -190,6 +192,43 @@ export default function ClaimForm() {
     UNCERTAIN: "bg-amber-100 text-amber-700 border-amber-300",
   };
 
+  const handleReNotarize = async (record: NotarizationRecord) => {
+    if (!address || !record.claim || !record.source_url) return;
+    setReNotarizingId(record.record_id ?? null);
+    try {
+      const tx = await buildReNotarizeTx(record.claim, record.source_url, address);
+      const hash = await sendTransaction(tx);
+      toast({ title: "Re-notarization broadcast!", description: `Tx: ${hash}` });
+      setPhase("pending");
+      setSubmitted({ recordId: record.record_id ?? "", claim: record.claim, url: record.source_url, txHash: hash });
+
+      const receipt = await waitForReceipt(hash, 10, 3000);
+      if (receipt && receipt.status === "0x0") {
+        setPhase("idle");
+        setError("Re-notarization transaction reverted on-chain.");
+        toast({ title: "Transaction Reverted", description: "Tx was rejected on-chain", variant: "destructive" });
+        loadMyRecent();
+        return;
+      }
+
+      const newRecord = await waitForRecord(record.record_id ?? computeRecordId(record.claim, record.source_url));
+      if (newRecord) {
+        setConfirmed(newRecord);
+        setPhase("confirmed");
+        toast({ title: "Re-notarization complete", description: newRecord.verdict });
+      } else {
+        setPhase("deferred");
+      }
+      loadMyRecent();
+    } catch (err) {
+      setPhase("idle");
+      setError(err instanceof Error ? err.message : "Re-notarization failed");
+      toast({ title: "Error", description: "Re-notarization failed", variant: "destructive" });
+    } finally {
+      setReNotarizingId(null);
+    }
+  };
+
   return (
     <section className="relative mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute -top-10 -right-20 h-72 w-72 rounded-full bg-blob-lilac animate-float-slower" />
@@ -327,6 +366,27 @@ export default function ClaimForm() {
                     <p className="truncate text-xs">{submitted.url}</p>
                   )}
 
+                  {/* Content digest */}
+                  {confirmed.content_digest && (
+                    <div className="mt-2">
+                      <p className="text-xs font-bold">Content Digest:</p>
+                      <p className="font-mono break-all text-[10px] opacity-70">
+                        {confirmed.content_digest}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Freshness */}
+                  {confirmed.expires_at != null && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {daysUntilExpiry(confirmed) !== null ? (
+                        <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                          Fresh ({daysUntilExpiry(confirmed)}d remaining)
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+
                   <p className="mt-3 break-all font-mono text-[10px] opacity-70">
                     record_id: {confirmed.record_id ?? submitted.recordId}
                   </p>
@@ -435,6 +495,28 @@ export default function ClaimForm() {
                     {safeConfidence(record.confidence).toFixed(2)}
                   </span>
                 </p>
+                {record.expires_at != null && (
+                  <p className="mt-1 text-[10px]">
+                    {daysUntilExpiry(record) !== null ? (
+                      <span className={isExpired(record) ? "text-amber-600 font-bold" : "text-emerald-600"}>
+                        {isExpired(record) ? "Expired" : `Fresh (${daysUntilExpiry(record)}d remaining)`}
+                      </span>
+                    ) : null}
+                  </p>
+                )}
+                {isExpired(record) && address && (
+                  <button
+                    onClick={() => handleReNotarize(record)}
+                    disabled={reNotarizingId === record.record_id}
+                    className="mt-2 inline-flex items-center gap-1 rounded-full border border-candy-300 bg-candy-50 px-3 py-1 text-[10px] font-semibold text-candy-700 transition-colors hover:border-candy-400 hover:bg-candy-100 disabled:opacity-50"
+                  >
+                    {reNotarizingId === record.record_id ? (
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-candy-300 border-t-candy-500" />
+                    ) : (
+                      "Refresh Verdict"
+                    )}
+                  </button>
+                )}
               </div>
             ))}
           </div>

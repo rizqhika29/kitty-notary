@@ -170,6 +170,31 @@ def test_compare_rejects_invalid_or_malformed_input():
                        {"verdict": "HACKED", "reason": "r", "confidence": "1"})
 
 
+def test_compare_rejects_different_content_digest():
+    a = {"verdict": "VERIFIED", "reason": "x", "confidence": "0.9",
+         "content_digest": "aaa111"}
+    b = {"verdict": "VERIFIED", "reason": "x", "confidence": "0.9",
+         "content_digest": "bbb222"}
+    assert not compare(a, b)
+
+
+def test_compare_accepts_same_content_digest():
+    a = {"verdict": "VERIFIED", "reason": "x", "confidence": "0.9",
+         "content_digest": "aaa111"}
+    b = {"verdict": "VERIFIED", "reason": "x", "confidence": "0.9",
+         "content_digest": "aaa111"}
+    assert compare(a, b)
+
+
+def test_compare_ignores_digest_when_one_missing():
+    """If one side has no digest (e.g. source unavailable), the verdict
+    comparison still proceeds on category + tier only."""
+    a = {"verdict": "VERIFIED", "reason": "x", "confidence": "0.9",
+         "content_digest": "aaa111"}
+    b = {"verdict": "VERIFIED", "reason": "x", "confidence": "0.9"}
+    assert compare(a, b)
+
+
 def test_tier_boundaries_match_vm_tests():
     assert AINotary._tier("0.8") == "HIGH"
     assert AINotary._tier("0.7999") == "MEDIUM"

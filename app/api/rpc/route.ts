@@ -13,7 +13,7 @@ const READ_METHODS = new Set([
   "get_record_by_id",
   "get_records_by_requester",
 ]);
-const BUILD_METHODS = new Set(["notarize"]);
+const BUILD_METHODS = new Set(["notarize", "re_notarize"]);
 const MAX_ARGS = 4;
 const MAX_ARG_STRING = 2048;
 const MAX_VIEWS_PER_BATCH = 12;

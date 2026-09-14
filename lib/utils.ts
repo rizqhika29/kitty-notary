@@ -52,3 +52,28 @@ export function safeSourceHref(url: string): string | null {
     return null;
   }
 }
+
+/** Check whether a notarization record has passed its expiry timestamp. */
+export function isExpired(record: { expires_at?: number | string }): boolean {
+  const ts = typeof record.expires_at === "number"
+    ? record.expires_at
+    : Number(record.expires_at);
+  if (!Number.isFinite(ts) || ts <= 0) return false;
+  return Date.now() / 1000 > ts;
+}
+
+/** Days remaining until the record expires (negative if already expired). */
+export function daysUntilExpiry(record: { expires_at?: number | string }): number | null {
+  const ts = typeof record.expires_at === "number"
+    ? record.expires_at
+    : Number(record.expires_at);
+  if (!Number.isFinite(ts) || ts <= 0) return null;
+  const diffSec = ts - Date.now() / 1000;
+  return Math.round(diffSec / 86400);
+}
+
+/** Shorten a hex digest for inline display: first 8 + last 4 chars. */
+export function shortDigest(digest: string): string {
+  if (!digest || digest.length < 16) return digest ?? "";
+  return `${digest.slice(0, 8)}...${digest.slice(-4)}`;
+}

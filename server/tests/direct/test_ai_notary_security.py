@@ -321,3 +321,39 @@ def test_source_unavailable_forces_uncertain(direct_vm, direct_deploy, direct_al
     assert record["verdict"] == "UNCERTAIN"
     assert record["confidence"] == 0
     assert isinstance(record["confidence"], int)
+
+
+def test_same_content_same_url_same_digest(direct_vm, direct_deploy, direct_alice):
+    contract = direct_deploy("contracts/ai_notary.py")
+    direct_vm.sender = direct_alice
+    _mock_news(direct_vm, body='{"version": "v1"}')
+    _mock_llm(direct_vm)
+
+    contract.notarize("Claim A", URL)
+    digest_a = json.loads(contract.get_record(0))["content_digest"]
+
+    _mock_news(direct_vm, body='{"version": "v1"}')
+    _mock_llm(direct_vm)
+
+    contract.notarize("Claim B", URL)
+    digest_b = json.loads(contract.get_record(1))["content_digest"]
+
+    assert digest_a == digest_b
+
+
+def test_different_content_different_digest(direct_vm, direct_deploy, direct_alice):
+    contract = direct_deploy("contracts/ai_notary.py")
+    direct_vm.sender = direct_alice
+    _mock_news(direct_vm, body='{"version": "v1"}')
+    _mock_llm(direct_vm)
+
+    contract.notarize("Claim A", URL)
+    digest_a = json.loads(contract.get_record(0))["content_digest"]
+
+    _mock_news(direct_vm, body='{"version": "v2"}')
+    _mock_llm(direct_vm)
+
+    contract.notarize("Claim B", URL)
+    digest_b = json.loads(contract.get_record(1))["content_digest"]
+
+    assert digest_a != digest_b

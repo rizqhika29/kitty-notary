@@ -18,6 +18,11 @@ CONFIDENCE_SCALE = 10000
 TIER_HIGH_BP = 8000
 TIER_MEDIUM_BP = 5000
 
+# Default TTL for notarized records (90 days in seconds).
+# Records store an expires_at timestamp so auditors can detect staleness
+# when the source page has changed since the original fetch.
+DEFAULT_TTL_SECONDS = 90 * 24 * 3600  # 7_776_000
+
 ALLOWED_DOMAINS = (
     # Major news
     "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "cnn.com",
@@ -151,16 +156,24 @@ class AINotary(gl.Contract):
         def leader_fn():
             content = AINotary._fetch_source(url)
             if content is None:
-                return {"verdict": "UNCERTAIN", "reason": "source unavailable", "confidence": "0"}
+                return {"verdict": "UNCERTAIN", "reason": "source unavailable", "confidence": "0",
+                        "content_digest": "", "content_excerpt": ""}
             prompt = AINotary._build_prompt(claim, content)
-            return AINotary._evaluate_prompt(prompt)
+            result = AINotary._evaluate_prompt(prompt)
+            result["content_digest"] = AINotary._content_hash(content)
+            result["content_excerpt"] = AINotary._make_excerpt(content)
+            return result
 
         def fetch_and_evaluate():
             content = AINotary._fetch_source(url)
             if content is None:
-                return {"verdict": "UNCERTAIN", "reason": "source unavailable", "confidence": "0"}
+                return {"verdict": "UNCERTAIN", "reason": "source unavailable", "confidence": "0",
+                        "content_digest": "", "content_excerpt": ""}
             prompt = AINotary._build_prompt(claim, content)
-            return AINotary._evaluate_prompt(prompt)
+            result = AINotary._evaluate_prompt(prompt)
+            result["content_digest"] = AINotary._content_hash(content)
+            result["content_excerpt"] = AINotary._make_excerpt(content)
+            return result
 
         def validator_fn(leaders_res) -> bool:
             if not isinstance(leaders_res, gl.vm.Return):
@@ -185,6 +198,9 @@ class AINotary(gl.Contract):
             verdict = "UNCERTAIN"
 
         index = self.count
+        fetched_at = gl.message_raw["datetime"]
+        content_digest = verdict_data.get("content_digest", "")
+        content_excerpt = verdict_data.get("content_excerpt", "")
         record = json.dumps({
             "record_id": record_id,
             "claim": claim,
@@ -193,7 +209,11 @@ class AINotary(gl.Contract):
             "reason": verdict_data.get("reason", ""),
             "confidence": AINotary._confidence_bp(verdict_data.get("confidence")),
             "requester": requester,
-            "timestamp": gl.message_raw["datetime"],
+            "timestamp": fetched_at,
+            "content_digest": content_digest,
+            "content_excerpt": content_excerpt,
+            "fetched_at": fetched_at,
+            "expires_at": fetched_at + DEFAULT_TTL_SECONDS,
         })
 
         self.records[index] = record
@@ -207,6 +227,129 @@ class AINotary(gl.Contract):
             claim=claim,
             source_url=url,
             verdict=verdict,
+            content_digest=content_digest,
+        ).emit()
+
+        return index
+
+    @gl.public.write
+    def re_notarize(self, claim: str, source_url: str) -> u256:
+        """Refresh a verdict when the source page may have changed.
+
+        Re-fetches the content, compares its digest to the previous record.
+        If the content differs a new record is created with a back-reference
+        to the original via ``parent_digest``.  If the content is identical
+        the caller simply gets the existing record index appended to their
+        requester list.
+        """
+        claim = claim.strip()
+        source_url = source_url.strip()
+        if not claim or not source_url:
+            raise ValueError("claim and source_url must not be empty")
+        if not (source_url.startswith("https://") or source_url.startswith("http://")):
+            raise ValueError("source_url must start with http(s)://")
+        if not self._is_allowed_source(source_url):
+            raise ValueError("source_url domain not allowed")
+
+        requester = str(gl.message.sender_address).lower()
+        old_record_id = self._make_id(claim, source_url)
+        old_index = self.record_ids.get(old_record_id)
+
+        if old_index is None:
+            # No previous record — fall back to normal notarize.
+            return self.notarize(claim, source_url)
+
+        old_raw = self.records.get(old_index)
+        old_digest = ""
+        if old_raw:
+            try:
+                old_digest = json.loads(old_raw).get("content_digest", "")
+            except (TypeError, ValueError):
+                old_digest = ""
+
+        url = source_url
+
+        def leader_fn():
+            content = AINotary._fetch_source(url)
+            if content is None:
+                return {"verdict": "UNCERTAIN", "reason": "source unavailable", "confidence": "0",
+                        "content_digest": "", "content_excerpt": ""}
+            prompt = AINotary._build_prompt(claim, content)
+            result = AINotary._evaluate_prompt(prompt)
+            result["content_digest"] = AINotary._content_hash(content)
+            result["content_excerpt"] = AINotary._make_excerpt(content)
+            return result
+
+        def fetch_and_evaluate():
+            content = AINotary._fetch_source(url)
+            if content is None:
+                return {"verdict": "UNCERTAIN", "reason": "source unavailable", "confidence": "0",
+                        "content_digest": "", "content_excerpt": ""}
+            prompt = AINotary._build_prompt(claim, content)
+            result = AINotary._evaluate_prompt(prompt)
+            result["content_digest"] = AINotary._content_hash(content)
+            result["content_excerpt"] = AINotary._make_excerpt(content)
+            return result
+
+        def validator_fn(leaders_res) -> bool:
+            if not isinstance(leaders_res, gl.vm.Return):
+                return False
+            leader_data = leaders_res.calldata
+            if not isinstance(leader_data, dict):
+                return False
+            return AINotary._compare_verdicts(leader_data, fetch_and_evaluate())
+
+        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+
+        if isinstance(result, dict):
+            verdict_data = self._sanitize_verdict(result)
+        else:
+            verdict_data = self._sanitize_verdict({})
+
+        verdict = verdict_data.get("verdict")
+        if verdict not in VALID_VERDICTS:
+            verdict = "UNCERTAIN"
+
+        new_digest = verdict_data.get("content_digest", "")
+        fetched_at = gl.message_raw["datetime"]
+
+        # If content hasn't changed, just append the existing record.
+        if new_digest and new_digest == old_digest:
+            self._append_requester_record(requester, old_index)
+            return old_index
+
+        # Content changed — create a new record with a parent reference.
+        new_record_id = old_record_id + "_r" + str(self.count)
+        index = self.count
+        record = json.dumps({
+            "record_id": new_record_id,
+            "claim": claim,
+            "source_url": url,
+            "verdict": verdict,
+            "reason": verdict_data.get("reason", ""),
+            "confidence": AINotary._confidence_bp(verdict_data.get("confidence")),
+            "requester": requester,
+            "timestamp": fetched_at,
+            "content_digest": new_digest,
+            "content_excerpt": verdict_data.get("content_excerpt", ""),
+            "fetched_at": fetched_at,
+            "expires_at": fetched_at + DEFAULT_TTL_SECONDS,
+            "parent_record_id": old_record_id,
+            "parent_digest": old_digest,
+        })
+
+        self.records[index] = record
+        self.record_ids[new_record_id] = index
+        self._append_requester_record(requester, index)
+        self.count = self.count + u256(1)
+
+        NotarizedEvent(
+            index,
+            gl.message.sender_address,
+            claim=claim,
+            source_url=url,
+            verdict=verdict,
+            content_digest=new_digest,
         ).emit()
 
         return index
@@ -317,14 +460,27 @@ class AINotary(gl.Contract):
 
     @staticmethod
     def _compare_verdicts(a: dict, b: dict) -> bool:
-        """Validators agree on the verdict category AND its confidence tier."""
+        """Validators agree on the verdict category AND its confidence tier.
+
+        When both results carry a ``content_digest``, the digests must also
+        match — this binds the verdict to the exact fetched content and
+        prevents validators from reaching consensus on different source
+        material.
+        """
         if not isinstance(a, dict) or not isinstance(b, dict):
             return False
         if a.get("verdict") != b.get("verdict"):
             return False
         if a.get("verdict") not in VALID_VERDICTS:
             return False
-        return AINotary._tier(a.get("confidence")) == AINotary._tier(b.get("confidence"))
+        if AINotary._tier(a.get("confidence")) != AINotary._tier(b.get("confidence")):
+            return False
+        # Bind verdict to exact fetched content when both sides have a digest.
+        a_digest = a.get("content_digest", "")
+        b_digest = b.get("content_digest", "")
+        if a_digest and b_digest and a_digest != b_digest:
+            return False
+        return True
 
     @staticmethod
     def _make_id(claim: str, source_url: str) -> str:
@@ -346,6 +502,21 @@ class AINotary(gl.Contract):
         if not body:
             return None
         return body[:MAX_SOURCE_LENGTH]
+
+    @staticmethod
+    def _content_hash(content: str) -> str:
+        """Keccak-256 digest of the fetched content for audit binding."""
+        h = Keccak256()
+        h.update(content.encode("utf-8"))
+        return h.hexdigest()
+
+    @staticmethod
+    def _make_excerpt(content: str, max_len: int = 500) -> str:
+        """Return a short excerpt of the fetched content for display."""
+        text = content.strip()
+        if len(text) <= max_len:
+            return text
+        return text[:max_len]
 
     @staticmethod
     def _is_allowed_source(url: str) -> bool:

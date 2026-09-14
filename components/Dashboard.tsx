@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { getRecord, getRecordCount } from "@/lib/contract";
 import { cn } from "@/lib/utils";
 import { KittyCartoon, PawPrint } from "@/components/cat";
+import { isExpired, daysUntilExpiry } from "@/lib/utils";
 
 const verdictBadge: Record<string, string> = {
   VERIFIED: "bg-emerald-100 text-emerald-700 border-emerald-300",
@@ -13,7 +14,7 @@ const verdictBadge: Record<string, string> = {
 
 export default function Dashboard() {
   const [count, setCount] = useState(0);
-  const [latestRecords, setLatestRecords] = useState<Map<string, string>>(new Map());
+  const [latestRecords, setLatestRecords] = useState<Map<string, { verdict: string; expires_at?: number }>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,13 +23,13 @@ export default function Dashboard() {
         const total = Number(await getRecordCount()) || 0;
         setCount(total);
 
-        const records = new Map<string, string>();
+        const records = new Map<string, { verdict: string; expires_at?: number }>();
         const fetchCount = Math.min(total, 5);
         for (let i = 0; i < fetchCount; i++) {
           const raw = await getRecord(i);
           if (raw && raw !== "{}") {
             const parsed = JSON.parse(raw);
-            records.set(String(i), parsed.verdict || "UNKNOWN");
+            records.set(String(i), { verdict: parsed.verdict || "UNKNOWN", expires_at: parsed.expires_at });
           }
         }
         setLatestRecords(records);
@@ -43,7 +44,7 @@ export default function Dashboard() {
   }, []);
 
   const verified = Array.from(latestRecords.values()).filter(
-    (v) => v === "VERIFIED"
+    (v) => v.verdict === "VERIFIED"
   ).length;
 
   return (
@@ -109,7 +110,7 @@ export default function Dashboard() {
           <div className="space-y-3">
             {Array.from(latestRecords.entries())
               .sort((a, b) => Number(b[0]) - Number(a[0]))
-              .map(([index, verdict]) => (
+              .map(([index, { verdict, expires_at }]) => (
                 <div
                   key={index}
                   className="flex items-center justify-between rounded-2xl border-2 border-candy-100 bg-card p-4 transition-all hover:border-candy-300"
@@ -120,14 +121,21 @@ export default function Dashboard() {
                     </span>
                     Record #{index}
                   </span>
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full border-2 px-3 py-0.5 text-xs font-bold",
-                      verdictBadge[verdict] ?? "bg-gray-100 text-gray-600 border-gray-300"
+                  <div className="flex items-center gap-2">
+                    {expires_at != null && (
+                      <span className={`text-[10px] ${isExpired({ expires_at }) ? "text-amber-600 font-bold" : "text-emerald-600"}`}>
+                        {isExpired({ expires_at }) ? "Expired" : `${daysUntilExpiry({ expires_at })}d`}
+                      </span>
                     )}
-                  >
-                    {verdict}
-                  </span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full border-2 px-3 py-0.5 text-xs font-bold",
+                        verdictBadge[verdict] ?? "bg-gray-100 text-gray-600 border-gray-300"
+                      )}
+                    >
+                      {verdict}
+                    </span>
+                  </div>
                 </div>
               ))}
           </div>

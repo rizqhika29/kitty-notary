@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
-import { safeConfidence, safeSourceHref, formatAddress } from "@/lib/utils";
+import { safeConfidence, safeSourceHref, formatAddress, isExpired, daysUntilExpiry, shortDigest } from "@/lib/utils";
 import { KittyCartoon } from "@/components/cat";
 import type { NotarizationRecord } from "@/types";
 
@@ -136,6 +136,72 @@ export default function RecordDetailModal({ record, onClose }: RecordDetailModal
               {record.reason || "No reasoning provided."}
             </p>
           </div>
+
+          {/* Content Digest & Freshness */}
+          {(record.content_digest || record.content_excerpt || record.fetched_at) && (
+            <div className="rounded-2xl border border-candy-100 bg-candy-50/50 p-4 space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wide text-candy-500">
+                Source Audit
+              </label>
+
+              {/* Freshness badge */}
+              {record.expires_at != null && (
+                <div className="flex items-center gap-2">
+                  {isExpired(record) ? (
+                    <span className="inline-flex items-center rounded-full border-2 border-amber-300 bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-700">
+                      Expired — source may have changed
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border-2 border-emerald-300 bg-emerald-100 px-3 py-0.5 text-xs font-bold text-emerald-700">
+                      Fresh ({daysUntilExpiry(record)} days remaining)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Content digest */}
+              {record.content_digest && (
+                <div>
+                  <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-candy-400">
+                    Content Digest (keccak-256)
+                  </label>
+                  <p className="font-mono break-all text-[11px] leading-relaxed text-candy-700">
+                    {record.content_digest}
+                  </p>
+                </div>
+              )}
+
+              {/* Content excerpt */}
+              {record.content_excerpt && (
+                <div>
+                  <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-candy-400">
+                    Fetched Content Excerpt
+                  </label>
+                  <p className="whitespace-pre-wrap rounded-xl border border-candy-100 bg-white/60 p-3 text-xs leading-relaxed text-candy-800 max-h-40 overflow-y-auto">
+                    {record.content_excerpt}
+                  </p>
+                </div>
+              )}
+
+              {/* Fetched at */}
+              {record.fetched_at && (
+                <div className="text-[10px] text-candy-500">
+                  Fetched at:{" "}
+                  {typeof record.fetched_at === "number"
+                    ? new Date(record.fetched_at * 1000).toLocaleString()
+                    : record.fetched_at}
+                </div>
+              )}
+
+              {/* Parent reference (re-notarization) */}
+              {record.parent_record_id && (
+                <div className="flex items-center gap-2 text-[10px] text-candy-500">
+                  <span className="font-bold">Re-notarization of:</span>
+                  <span className="font-mono break-all">{shortDigest(record.parent_digest ?? "")}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Metadata row */}
           <div className="grid grid-cols-2 gap-4 text-xs">

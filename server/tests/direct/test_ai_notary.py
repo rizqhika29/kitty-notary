@@ -63,6 +63,14 @@ def test_get_record(direct_vm, direct_deploy, direct_alice):
     assert not isinstance(record["confidence"], float)
     assert record["record_id"]
     assert record["timestamp"]
+    # Audit trail fields
+    assert record["content_digest"]
+    assert isinstance(record["content_digest"], str) and len(record["content_digest"]) == 64
+    assert record["content_excerpt"]
+    assert isinstance(record["content_excerpt"], str)
+    assert isinstance(record["fetched_at"], int)
+    assert isinstance(record["expires_at"], int)
+    assert record["expires_at"] > record["fetched_at"]
 
 
 def test_duplicate_claim_is_deduplicated(direct_vm, direct_deploy, direct_alice):

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { batchViews } from "@/lib/contract";
 import { useWallet } from "@/lib/wallet";
-import { safeConfidence, safeSourceHref } from "@/lib/utils";
+import { safeConfidence, safeSourceHref, isExpired, daysUntilExpiry } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { KittyCartoon, PawPrint } from "@/components/cat";
 import RecordDetailModal from "@/components/RecordDetailModal";
@@ -216,7 +216,7 @@ export default function RecordsTable({ mode = "all" }: RecordsTableProps) {
             <table className="min-w-full divide-y divide-candy-100">
               <thead className="bg-gradient-to-r from-candy-100 to-lilac-100">
                 <tr>
-                  {["#", "Claim", "Source", "Verdict", "Confidence", "Requester", ""].map(
+                  {["#", "Claim", "Source", "Verdict", "Confidence", "Freshness", "Requester", ""].map(
                     (h, i) => (
                       <th
                         key={i}
@@ -275,6 +275,21 @@ export default function RecordsTable({ mode = "all" }: RecordsTableProps) {
                         >
                           {safeConfidence(record.confidence).toFixed(2)}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {record.expires_at != null ? (
+                          isExpired(record) ? (
+                            <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                              Expired
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">
+                              {daysUntilExpiry(record)}d left
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                         {record.requester.slice(0, 6)}...

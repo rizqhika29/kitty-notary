@@ -67,6 +67,28 @@ export async function buildNotarizeTx(
   return result;
 }
 
+/** Build a re-notarize payload: re-fetches the source and creates a new
+ *  record with parent reference if content has changed, or returns the
+ *  existing record index if content is identical. */
+export async function buildReNotarizeTx(
+  claim: string,
+  sourceUrl: string,
+  from: string
+): Promise<BuiltTransaction> {
+  const result = (await rpc("build", "re_notarize", [claim, sourceUrl], from)) as
+    | BuiltTransaction
+    | undefined;
+  if (
+    !result ||
+    typeof result.to !== "string" ||
+    typeof result.data !== "string" ||
+    !result.data.startsWith("0x")
+  ) {
+    throw new Error("Failed to build the re-notarize payload — please retry");
+  }
+  return result;
+}
+
 export async function getRecord(index: number) {
   const result = await rpc("read", "get_record", [index]);
   return result as string;
