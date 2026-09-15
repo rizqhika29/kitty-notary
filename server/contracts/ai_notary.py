@@ -23,6 +23,37 @@ TIER_MEDIUM_BP = 5000
 # when the source page has changed since the original fetch.
 DEFAULT_TTL_SECONDS = 90 * 24 * 3600  # 7_776_000
 
+
+def _parse_iso_datetime_to_epoch(s: str) -> int:
+    """Parse an ISO 8601 datetime string (e.g. ``2026-09-15T03:40:28.638397Z``)
+    into Unix epoch seconds.  Pure integer arithmetic – no float or datetime
+    import needed, so it is safe inside the GenVM."""
+    s = s.strip()
+    if s.endswith("Z"):
+        s = s[:-1]
+    date_part, time_part = s.split("T", 1)
+    y, m, d = date_part.split("-")
+    year = int(y)
+    month = int(m)
+    day = int(d)
+    hh, mm, ss = time_part.split(":")
+    hour = int(hh)
+    minute = int(mm)
+    sec = int(ss.split(".")[0])
+    # Days in each month (non-leap)
+    days_in_month = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    # Leap year check
+    is_leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+    # Days from 1970-01-01 to year-01-01
+    days = (year - 1970) * 365 + (year - 1969) // 4 - (year - 1901) // 100 + (year - 1601) // 400
+    # Add days for months in current year
+    for i in range(1, month):
+        days += days_in_month[i]
+    if is_leap and month > 2:
+        days += 1
+    days += day - 1
+    return days * 86400 + hour * 3600 + minute * 60 + sec
+
 ALLOWED_DOMAINS = (
     # Major news
     "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "cnn.com",
@@ -198,7 +229,7 @@ class AINotary(gl.Contract):
             verdict = "UNCERTAIN"
 
         index = self.count
-        fetched_at = gl.message_raw["datetime"]
+        fetched_at = _parse_iso_datetime_to_epoch(gl.message_raw["datetime"])
         content_digest = verdict_data.get("content_digest", "")
         content_excerpt = verdict_data.get("content_excerpt", "")
         record = json.dumps({
@@ -311,7 +342,7 @@ class AINotary(gl.Contract):
             verdict = "UNCERTAIN"
 
         new_digest = verdict_data.get("content_digest", "")
-        fetched_at = gl.message_raw["datetime"]
+        fetched_at = _parse_iso_datetime_to_epoch(gl.message_raw["datetime"])
 
         # If content hasn't changed, just append the existing record.
         if new_digest and new_digest == old_digest:
@@ -380,7 +411,8 @@ class AINotary(gl.Contract):
         (leader output passes through here before and after consensus).
         """
         if not isinstance(data, dict):
-            return {"verdict": "UNCERTAIN", "reason": "invalid model output", "confidence": ""}
+            return {"verdict": "UNCERTAIN", "reason": "invalid model output", "confidence": "",
+                    "content_digest": "", "content_excerpt": ""}
         verdict = data.get("verdict")
         if verdict not in VALID_VERDICTS:
             verdict = "UNCERTAIN"
@@ -392,6 +424,8 @@ class AINotary(gl.Contract):
             "verdict": verdict,
             "reason": reason,
             "confidence": "" if conf is None else str(conf),
+            "content_digest": data.get("content_digest", ""),
+            "content_excerpt": data.get("content_excerpt", ""),
         }
 
     @staticmethod

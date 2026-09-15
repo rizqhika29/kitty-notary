@@ -53,7 +53,7 @@ You           LLM reads       Multiple AI     Permanent
 
 ## Contract
 
-**Address:** `0xe5F681bDEfa54bD387807125e4F86c5E3C0f31d2`
+**Address:** `0x76c66A363A24f614e72ed3b7D23ED1551848Ba2b`
 **Network:** GenLayer Studionet (chainId: 61999)
 **Explorer:** [View on GenLayer Explorer](https://genlayer-explorer.vercel.app)
 
@@ -78,7 +78,7 @@ npm install
 ```bash
 cp .env.example .env
 # Edit .env with your settings:
-# NEXT_PUBLIC_CONTRACT_ADDRESS=0xe5F681bDEfa54bD387807125e4F86c5E3C0f31d2
+# NEXT_PUBLIC_CONTRACT_ADDRESS=0x76c66A363A24f614e72ed3b7D23ED1551848Ba2b
 # NEXT_PUBLIC_RPC_ENDPOINT=https://studio.genlayer.com/api
 # NEXT_PUBLIC_NETWORK=studionet
 # GENLAYER_RPC_URL=https://studio.genlayer.com/api
@@ -254,7 +254,7 @@ vercel --prod
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | `0xe5F681bDEfa54bD387807125e4F86c5E3C0f31d2` |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | `0x76c66A363A24f614e72ed3b7D23ED1551848Ba2b` |
 | `NEXT_PUBLIC_RPC_ENDPOINT` | `https://studio.genlayer.com/api` |
 | `NEXT_PUBLIC_NETWORK` | `studionet` |
 | `GENLAYER_RPC_URL` | `https://studio.genlayer.com/api` |
