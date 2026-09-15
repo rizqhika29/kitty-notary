@@ -12,7 +12,7 @@
 [![Frontend](https://img.shields.io/badge/Frontend-Next.js-black.svg)](https://nextjs.org)
 [![Deploy](https://img.shields.io/badge/Deploy-Vercel-black.svg)](https://kitty-notary.vercel.app)
 
-[Live Demo](https://kitty-notary.vercel.app) · [Contract](https://studio.genlayer.com) · [Report Bug](https://github.com/rizqhika29/kitty-notary/issues)
+[Live Demo](https://kitty-notary.vercel.app) · [Contract](https://explorer-studio.genlayer.com/contracts/0x76c66A363A24f614e72ed3b7D23ED1551848Ba2b) · [Report Bug](https://github.com/rizqhika29/kitty-notary/issues)
 
 </div>
 
