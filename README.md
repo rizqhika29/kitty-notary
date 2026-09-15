@@ -55,7 +55,7 @@ You           LLM reads       Multiple AI     Permanent
 
 **Address:** `0x76c66A363A24f614e72ed3b7D23ED1551848Ba2b`
 **Network:** GenLayer Studionet (chainId: 61999)
-**Explorer:** [View on GenLayer Explorer](https://genlayer-explorer.vercel.app)
+**Explorer:** [View on GenLayer Explorer](https://explorer-studio.genlayer.com/contracts/0x76c66A363A24f614e72ed3b7D23ED1551848Ba2b)
 
 ## Quick Start
 
